@@ -1,6 +1,7 @@
 -- ============================================================
 -- FENIX CAR HIRE — Full Database Setup
 -- Import this in phpMyAdmin after creating fenix_db
+-- Enhanced with indexes and security updates
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS fenix_db;
@@ -12,9 +13,10 @@ CREATE TABLE IF NOT EXISTS admin_users (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_username (username)
 );
--- Login: admin / fenix2026
+-- Default Login: admin / fenix2026 (CHANGE THIS ON FIRST LOGIN!)
 INSERT INTO admin_users (username, password, full_name) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uXV/WuBiK', 'Fenix Admin');
 
@@ -28,10 +30,12 @@ CREATE TABLE IF NOT EXISTS vehicles (
     transmission ENUM('Automatic','Manual') DEFAULT 'Automatic',
     fuel ENUM('Petrol','Diesel') DEFAULT 'Petrol',
     mileage INT DEFAULT 0,
-    status ENUM('available','booked','maintenance') DEFAULT 'available',
+    status ENUM('available','rented','maintenance','retired') DEFAULT 'available',
     image VARCHAR(255) DEFAULT 'default.jpg',
     notes TEXT,
-    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_status (status),
+    KEY idx_plate (plate)
 );
 INSERT INTO vehicles (name, category, plate, seats, transmission, fuel, mileage, status) VALUES
 ('Toyota Fortuner',      'SUV',        'MK70HF8P',  7,  'Automatic', 'Diesel', 26552, 'available'),
@@ -59,10 +63,14 @@ CREATE TABLE IF NOT EXISTS bookings (
     amount_paid DECIMAL(10,2) DEFAULT 0,
     amount_pending DECIMAL(10,2) DEFAULT 0,
     bad_debt DECIMAL(10,2) DEFAULT 0,
-    status ENUM('pending','active','completed','cancelled') DEFAULT 'pending',
+    status ENUM('pending','confirmed','active','completed','cancelled') DEFAULT 'pending',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL,
+    KEY idx_status (status),
+    KEY idx_vehicle_id (vehicle_id),
+    KEY idx_created_at (created_at),
+    KEY idx_booking_ref (booking_ref)
 );
 INSERT INTO bookings (booking_ref, customer_name, customer_phone, vehicle_id, pickup_date, return_date, mileage_out, mileage_in, amount_paid, status) VALUES
 ('BK-001', 'Ekhaya Funeral', '78068407', 2, '2026-03-09', '2026-03-10', 26354, 26552, 7798.15, 'completed'),
@@ -92,7 +100,10 @@ CREATE TABLE IF NOT EXISTS invoices (
     status ENUM('pending','paid','cancelled') DEFAULT 'pending',
     invoice_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+    KEY idx_status (status),
+    KEY idx_booking_id (booking_id),
+    KEY idx_invoice_no (invoice_no)
 );
 INSERT INTO invoices (invoice_no, type, customer_name, vehicle_name, rate_per_day, quantity, days, contract_fee, excess_kms, excess_total, subtotal, vat, total, status, invoice_date) VALUES
 ('Inv-06','invoice',  'Ekhaya Funeral','Staria x2',1800.00,2,1,200.00,271,2981.00,6781.00,1017.15,7798.15,'paid','2026-03-09'),
@@ -141,7 +152,9 @@ CREATE TABLE IF NOT EXISTS checksheets (
     date_in  DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL,
+    KEY idx_booking_id (booking_id),
+    KEY idx_vehicle_id (vehicle_id)
 );
 
 -- ── NOTIFICATIONS ────────────────────────────────────────────
@@ -150,8 +163,11 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     type ENUM('booking','payment','system') DEFAULT 'booking',
     is_read TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_is_read (is_read),
+    KEY idx_created_at (created_at)
 );
 INSERT INTO notifications (message, type, is_read) VALUES
 ('New booking from Wandile Maseko — Fortuner', 'booking', 0),
 ('Invoice Inv-06 paid — E7,798.15', 'payment', 1);
+
